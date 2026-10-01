@@ -1,0 +1,25 @@
+{
+  "name": "phundz-cashout-demo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"npm run dev -w @phundz/api\" \"npm run dev -w @phundz/web\"",
+    "test": "vitest run",
+    "migrate": "npm run migrate -w @phundz/api",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "jsdom": "^25.0.1",
+    "dotenv": "^16.4.7",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
