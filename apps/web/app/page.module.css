@@ -11,7 +11,7 @@
 .intro h1 em { color: var(--forest); font-weight: 400; }
 .introCopy { max-width: 300px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.75; }
 .requestSection { min-width: 0; }
-.sectionHeading, .historyHeading { display: flex; align-items: end; justify-content: space-between; padding-bottom: 21px; border-bottom: 1px solid var(--line); }
+.sectionHeading, .historyHeading { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 21px; border-bottom: 1px solid var(--line); }
 .sectionHeading h2, .historyHeading h2 { margin: 8px 0 0; font-size: 21px; font-weight: 600; letter-spacing: 0; }
 .currencyTag { padding: 7px 9px; border: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .5px; }
 .currencyTag span { padding: 0 4px; color: #7f9e30; }
@@ -50,7 +50,7 @@
 .secondaryButton { border: 1px solid #bdcbc1; color: var(--ink); background: transparent; cursor: pointer; font-size: 13px; font-weight: 650; }
 .secondaryButton:hover { background: #ebf0e8; }
 .history { grid-column: 2; min-width: 0; margin-top: -10px; }
-.historyHeading { align-items: end; }
+.historyHeading { align-items: flex-end; }
 .count { color: #8a9c91; font-family: Georgia, serif; font-size: 23px; }
 .listMessage { margin: 0; padding: 23px 0; color: var(--muted); font-size: 13px; }
 .listError { padding: 17px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--error); font-size: 13px; }
