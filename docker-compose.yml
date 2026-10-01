@@ -9,6 +9,8 @@ services:
       - "5432:5432"
     volumes:
       - phundz-postgres:/var/lib/postgresql/data
+      # Creates the separate phundz_test database used by integration tests.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U phundz -d phundz"]
       interval: 5s
