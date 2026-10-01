@@ -30,6 +30,7 @@ A **simulation-only** cash-out request flow for Phundz, a dollar-backed wallet w
 │       ├── lib/                  Typed API client, format helpers, data hook
 │       └── tests/                React Testing Library + unit tests
 ├── packages/shared/              Zod schemas, money/phone helpers, shared types
+├── scripts/dev-db.mts            `npm run db`: local PostgreSQL without Docker
 ├── docker/postgres-init/         Creates the phundz_test database
 ├── docker-compose.yml
 └── .env.example

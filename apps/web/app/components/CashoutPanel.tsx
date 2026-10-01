@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { cashoutRequestSchema, type CashoutRequest } from "@phundz/shared";
+import {
+  AMOUNT_DECIMAL_PLACES,
+  MAX_AMOUNT_USDC,
+  MIN_AMOUNT_USDC,
+  cashoutRequestSchema,
+  toFieldErrors,
+  type CashoutRequest,
+} from "@phundz/shared";
 import { ApiError, createCashoutRequest } from "../../lib/api-client";
 import { formatAmount } from "../../lib/format";
 import styles from "../page.module.css";
@@ -54,12 +61,8 @@ export function CashoutPanel({ onSubmitted }: { onSubmitted: () => void }) {
     setFeedback(null);
     const result = cashoutRequestSchema.safeParse(values);
     if (!result.success) {
-      const next: FieldErrors = {};
-      for (const issue of result.error.issues) {
-        const field = issue.path[0];
-        if (field === "amount" || field === "phone") next[field] ??= issue.message;
-      }
-      showErrors(next);
+      // Same mapping the API uses, so client and server messages match.
+      showErrors(pickFieldErrors(toFieldErrors(result.error)));
       return;
     }
     setErrors({});
@@ -192,7 +195,8 @@ export function CashoutPanel({ onSubmitted }: { onSubmitted: () => void }) {
               </p>
             )}
             <p className={styles.hint} id="amount-hint">
-              Between 1.00 and 1,000.00, up to 2 decimal places
+              Between {formatAmount(MIN_AMOUNT_USDC)} and {formatAmount(MAX_AMOUNT_USDC)}, up to{" "}
+              {AMOUNT_DECIMAL_PLACES} decimal places
             </p>
           </div>
 

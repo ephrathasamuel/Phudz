@@ -17,16 +17,17 @@ if (!process.env.DATABASE_URL) {
 }
 
 const app = new URL(process.env.DATABASE_URL);
-const databases = [app, process.env.TEST_DATABASE_URL && new URL(process.env.TEST_DATABASE_URL)]
-  .filter(Boolean)
-  .map((url) => decodeURIComponent(url.pathname.slice(1)));
+const port = Number(app.port || 5432);
+const databases = [process.env.DATABASE_URL, process.env.TEST_DATABASE_URL]
+  .filter((url): url is string => Boolean(url))
+  .map((url) => decodeURIComponent(new URL(url).pathname.slice(1)));
 
 const dataDir = path.join(root, ".pgdata");
 const pg = new EmbeddedPostgres({
   databaseDir: dataDir,
   user: decodeURIComponent(app.username),
   password: decodeURIComponent(app.password),
-  port: Number(app.port || 5432),
+  port,
   persistent: true,
   onLog: () => {},
 });
@@ -39,15 +40,16 @@ async function stopLeftoverServer() {
   if (!existsSync(path.join(dataDir, "postmaster.pid"))) return;
   const platform = process.platform === "win32" ? "windows" : process.platform;
   try {
-    const { pg_ctl } = await import(`@embedded-postgres/${platform}-${process.arch}`);
-    execFileSync(pg_ctl, ["stop", "-D", dataDir, "-m", "fast"], { stdio: "ignore" });
+    // Platform binary package that embedded-postgres itself installs.
+    const { pg_ctl } = (await import(`@embedded-postgres/${platform}-${process.arch}`)) as { pg_ctl: string };
+    execFileSync(pg_ctl,["stop", "-D", dataDir, "-m", "fast"], { stdio: "ignore" });
     console.log("Stopped a PostgreSQL server left running by a previous session.");
   } catch {
     // Not running (stale pid file); postgres cleans that up itself on start.
   }
 }
 
-function describe(error) {
+function describe(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   try {
@@ -66,7 +68,7 @@ try {
   }
   await pg.start();
 } catch (error) {
-  console.error(`Could not start PostgreSQL on port ${app.port || 5432}. Is another PostgreSQL already using that port?`);
+  console.error(`Could not start PostgreSQL on port ${port}. Is another PostgreSQL already using that port?`);
   console.error(describe(error));
   process.exit(1);
 }
@@ -80,7 +82,7 @@ for (const name of databases) {
   }
 }
 
-console.log(`PostgreSQL running on port ${app.port || 5432} (databases: ${databases.join(", ")}). Ctrl+C to stop.`);
+console.log(`PostgreSQL running on port ${port} (databases: ${databases.join(", ")}). Ctrl+C to stop.`);
 
 let stopping = false;
 async function stop() {
@@ -89,6 +91,6 @@ async function stop() {
   await pg.stop();
   process.exit(0);
 }
-process.on("SIGINT", stop);
-process.on("SIGTERM", stop);
+process.on("SIGINT", () => void stop());
+process.on("SIGTERM", () => void stop());
 setInterval(() => {}, 1 << 30);

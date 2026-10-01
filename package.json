@@ -8,20 +8,22 @@
   "scripts": {
     "dev": "concurrently -k -n api,web \"npm run dev -w @phundz/api\" \"npm run dev -w @phundz/web\"",
     "test": "vitest run",
-    "db": "node scripts/dev-db.mjs",
+    "db": "tsx scripts/dev-db.mts",
     "migrate": "npm run migrate -w @phundz/api",
     "migrate:test": "npm run migrate -w @phundz/api -- --test",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "tsc --noEmit -p scripts/tsconfig.json && npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^22.10.2",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "dotenv": "^16.4.7",
     "embedded-postgres": "18.4.0-beta.17",
     "jsdom": "^25.0.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }
