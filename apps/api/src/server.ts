@@ -1,18 +1,18 @@
 import { Pool } from "pg";
 import { createApp } from "./app";
-import { loadConfig } from "./config/env";
+import { loadConfig, loadDotenv } from "./config/env";
 
 async function main() {
+  loadDotenv();
   const config = loadConfig();
   const pool = new Pool({ connectionString: config.databaseUrl });
-  const app = await createApp({ db: pool, webOrigin: config.webOrigin });
-  try {
-    await app.listen({ port: config.port, host: "0.0.0.0" });
-  } catch (error) {
-    app.log.error(error);
-    await pool.end();
-    process.exitCode = 1;
-  }
+  const app = await createApp({ db: pool, webOrigin: config.webOrigin, logger: true });
+  app.addHook("onClose", () => pool.end());
+
+  await app.listen({ port: config.port, host: "0.0.0.0" });
 }
 
-void main();
+main().catch((error: unknown) => {
+  console.error("API failed to start:", error instanceof Error ? error.message : error);
+  process.exit(1);
+});

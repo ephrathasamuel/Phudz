@@ -9,6 +9,7 @@
     "dev": "concurrently -k -n api,web \"npm run dev -w @phundz/api\" \"npm run dev -w @phundz/web\"",
     "test": "vitest run",
     "migrate": "npm run migrate -w @phundz/api",
+    "migrate:test": "npm run migrate -w @phundz/api -- --test",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

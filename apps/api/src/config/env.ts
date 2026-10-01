@@ -1,8 +1,10 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { z } from "zod";
 
-dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+/** Repo-root .env, resolved from this file so it works regardless of cwd. */
+export const ROOT_ENV_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../.env");
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
@@ -10,14 +12,26 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
 });
 
-export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {
+export interface Config {
+  databaseUrl: string;
+  port: number;
+  webOrigin: string;
+}
+
+/** Loads and validates env; throws with the offending variable names so startup fails fast. */
+export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
   const result = envSchema.safeParse(environment);
   if (!result.success) {
-    throw new Error("Invalid environment configuration. Check DATABASE_URL, API_PORT, and WEB_ORIGIN.");
+    const problems = result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+    throw new Error(`Invalid environment configuration (${problems})`);
   }
   return {
     databaseUrl: result.data.DATABASE_URL,
     port: result.data.API_PORT,
     webOrigin: result.data.WEB_ORIGIN,
   };
+}
+
+export function loadDotenv() {
+  dotenv.config({ path: ROOT_ENV_PATH });
 }

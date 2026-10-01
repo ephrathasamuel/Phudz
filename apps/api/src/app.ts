@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import type { QueryExecutor } from "./db/query-executor";
-import { AppError } from "./errors/app-error";
+import { errorHandler, notFoundHandler } from "./errors/error-handler";
 import { CashoutRepository } from "./repositories/cashout-repository";
 import { registerCashoutRoutes } from "./routes/cashout-routes";
 import { CashoutService } from "./services/cashout-service";
@@ -9,39 +9,22 @@ import { CashoutService } from "./services/cashout-service";
 export interface AppOptions {
   db: QueryExecutor;
   webOrigin: string;
+  logger?: boolean;
 }
 
-export async function createApp(options: AppOptions) {
-  const app = Fastify({ logger: false });
-  await app.register(cors, { origin: options.webOrigin, methods: ["GET", "POST"] });
-  const service = new CashoutService(new CashoutRepository(options.db));
+/** Builds the app without listening, so tests can drive it with `inject()`. */
+export async function createApp({ db, webOrigin, logger = false }: AppOptions): Promise<FastifyInstance> {
+  const app = Fastify({ logger });
+
+  app.setErrorHandler(errorHandler);
+  app.setNotFoundHandler(notFoundHandler);
+  // An array makes the plugin echo the origin only on an exact match.
+  await app.register(cors, { origin: [webOrigin], methods: ["GET", "POST"] });
 
   app.get("/health", async () => ({ status: "ok" }));
-  await registerCashoutRoutes(app, service);
 
-  app.setNotFoundHandler((_request, reply) => {
-    reply.code(404).send({ error: { code: "NOT_FOUND", message: "Resource not found" } });
-  });
-  app.setErrorHandler((error, _request, reply) => {
-    if (error instanceof AppError) {
-      reply.code(error.statusCode).send({
-        error: {
-          code: error.code,
-          message: error.message,
-          ...(error.fields ? { fields: error.fields } : {}),
-        },
-      });
-      return;
-    }
-    if (error.validation) {
-      reply.code(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Request validation failed", fields: { request: "Invalid request" } },
-      });
-      return;
-    }
-    app.log.error(error);
-    reply.code(500).send({ error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" } });
-  });
+  const service = new CashoutService(new CashoutRepository(db));
+  registerCashoutRoutes(app, service);
 
   return app;
 }
