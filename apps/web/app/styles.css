@@ -16,3 +16,6 @@ html { min-width: 320px; background: var(--paper); }
 body { margin: 0; color: var(--ink); font-family: "Avenir Next", "Segoe UI", sans-serif; background: radial-gradient(ellipse at 78% 6%, rgba(212, 242, 106, .19), transparent 31rem), var(--paper); }
 button, input { font: inherit; }
 button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #93b743; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

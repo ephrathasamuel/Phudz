@@ -37,7 +37,9 @@
 .failure { color: #8d3028; background: #f8e7e2; }
 .review { padding-top: 8px; }
 .summaryRow { min-height: 65px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
-.summaryRow > span { color: var(--muted); font-size: 13px; }
+.summary { margin: 0; }
+.summaryRow dt { color: var(--muted); font-size: 13px; }
+.summaryRow dd { margin: 0; text-align: right; }
 .summaryRow strong { font-size: 15px; font-weight: 650; }
 .summaryRow small, .requestAmount small { color: var(--muted); font-size: 10px; font-weight: 700; }
 .demoNotice { display: flex; gap: 11px; margin: 22px 0; padding: 14px; color: #4e6224; background: #edf4d8; }
@@ -61,6 +63,12 @@
 .requestAmount span, .requestMeta time { color: var(--muted); font-size: 11px; }
 .requestMeta { display: grid; justify-items: end; gap: 7px; }
 .statusBadge { padding: 4px 7px; color: #536923; background: #e8f0d4; font-size: 10px; font-weight: 700; text-transform: capitalize; }
+.statusBadge[data-status="processing"] { color: #5a4a12; background: #f5ecc8; }
+.statusBadge[data-status="completed"] { color: #fff; background: var(--forest); }
+.statusBadge[data-status="failed"] { color: #8d3028; background: #f8e7e2; }
+.sectionHeading h2:focus { outline: none; }
+.sectionHeading h2:focus-visible { outline: 3px solid #93b743; outline-offset: 3px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .footer { min-height: 56px; padding: 15px clamp(22px, 7vw, 100px); display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; letter-spacing: .6px; }
 
 @media (max-width: 720px) {
@@ -71,8 +79,4 @@
   .introCopy { max-width: 360px; font-size: 14px; }
   .history { grid-column: 1; margin-top: -8px; }
   .footer { align-items: start; flex-direction: column; justify-content: center; gap: 5px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
