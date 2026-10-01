@@ -37,12 +37,25 @@ A **simulation-only** cash-out request flow for Phundz, a dollar-backed wallet w
 
 ## Setup
 
-Requirements: Node.js 20+, npm 10+, Docker.
+Requirements: Node.js 20+ and npm 10+. Docker is optional (see below).
 
 ```sh
 cp .env.example .env
-docker compose up -d        # Postgres 16 with databases phundz and phundz_test
 npm install
+```
+
+Start PostgreSQL using **one** of these:
+
+- **No Docker:** `npm run db`. Leave it running in its own terminal and press Ctrl+C to stop.
+  It runs a project-local PostgreSQL (via the `embedded-postgres` dev dependency), stores
+  data in `.pgdata/` (gitignored), and creates both databases from your `.env` URLs. If a
+  previous run was killed without shutting down, it stops that server first.
+- **Docker:** `docker compose up -d` starts Postgres 16 with the `phundz` and `phundz_test`
+  databases.
+
+Both listen on port 5432, so run only one. Then, in another terminal:
+
+```sh
 npm run migrate             # applies migrations to DATABASE_URL
 npm run migrate:test        # applies migrations to TEST_DATABASE_URL (optional; tests also do this)
 npm run dev                 # API on :4000, web on :3000
@@ -50,8 +63,8 @@ npm run dev                 # API on :4000, web on :3000
 
 Open http://localhost:3000.
 
-> The test database is created by `docker/postgres-init` only on the **first** start of an empty
-> volume. If your volume predates that, run
+> With Docker, the test database is created by `docker/postgres-init` only on the **first** start
+> of an empty volume. If your volume predates that, run
 > `docker compose exec postgres createdb -U phundz phundz_test`.
 
 ## Environment variables
