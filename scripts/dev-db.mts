@@ -52,8 +52,9 @@ async function stopLeftoverServer() {
 function describe(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
+  if (error === undefined || error === null) return String(error);
   try {
-    return JSON.stringify(error);
+    return JSON.stringify(error) ?? String(error);
   } catch {
     return String(error);
   }

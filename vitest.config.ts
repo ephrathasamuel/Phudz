@@ -11,5 +11,6 @@ export default defineConfig({
     environment: "node",
     include: ["packages/**/*.test.ts", "apps/**/*.test.{ts,tsx}"],
     restoreMocks: true,
+    hookTimeout: 30_000,
   },
 });

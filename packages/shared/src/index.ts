@@ -7,6 +7,8 @@ import { z } from "zod";
 export const AMOUNT_DECIMAL_PLACES = 2;
 export const MIN_AMOUNT_USDC = "1.00";
 export const MAX_AMOUNT_USDC = "1000.00";
+export const DEFAULT_FEE_USDC = "0.50";
+export const DEFAULT_RATE_KES_PER_USDC = "129.50";
 
 const NUMERIC_PATTERN = /^\d+(?:\.\d+)?$/;
 const AMOUNT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
@@ -73,10 +75,39 @@ export const phoneSchema = z
     return normalized;
   });
 
+export const quoteRequestSchema = z
+  .object({
+    amount: amountSchema,
+    phone: phoneSchema,
+  })
+  .strict();
+
+export type QuoteRequestInput = z.input<typeof quoteRequestSchema>;
+export type QuoteRequest = z.output<typeof quoteRequestSchema>;
+
+export interface QuoteRecord {
+  id: string;
+  amountUsdc: string;
+  feeUsdc: string;
+  rateKes: string;
+  grossKes: string;
+  netKes: string;
+  recipientPhone: string;
+  recipientName: string;
+  expiresAt: string;
+  ttlSeconds: number;
+}
+
 export const cashoutRequestSchema = z
   .object({
     amount: amountSchema,
     phone: phoneSchema,
+    quoteId: z.string().uuid("Invalid quote ID").optional(),
+    idempotencyKey: z
+      .string()
+      .min(8, "Idempotency key must be at least 8 characters")
+      .max(128)
+      .optional(),
   })
   .strict();
 
@@ -100,18 +131,70 @@ export const listCashoutRequestsQuerySchema = z
 export const CASHOUT_STATUSES = ["pending", "processing", "completed", "failed"] as const;
 export type CashoutStatus = (typeof CASHOUT_STATUSES)[number];
 
+export type PayoutMode = "mock" | "live";
+
+export interface AppConfig {
+  mode: PayoutMode;
+  currencyPair: string;
+  defaultRateKesPerUsdc: string;
+  fixedFeeUsdc: string;
+  minAmountUsdc: string;
+  maxAmountUsdc: string;
+}
+
+export interface WalletBalance {
+  userId: string;
+  availableUsdc: string;
+  heldUsdc: string;
+  totalUsdc: string;
+  currency: "USDC";
+}
+
+export interface DepositRecord {
+  id: string;
+  userId: string;
+  amountUsdc: string;
+  source: string;
+  status: "completed";
+  createdAt: string;
+}
+
+export type DatePreset = "all" | "today" | "yesterday" | "last7d" | "last30d" | "custom";
+
 /** A saved cash-out request as returned by the API. */
 export interface CashoutRequestRecord {
   id: string;
+  userId: string;
   /** Decimal string exactly as stored in NUMERIC(18,6), e.g. "12.500000". */
   amountUsdc: string;
+  feeUsdc: string;
+  rateKes: string;
+  netKes: string;
   /** E.164, e.g. "+254712345678". */
   phoneNumber: string;
+  recipientName?: string | null;
   status: CashoutStatus;
+  quoteId?: string | null;
+  idempotencyKey?: string | null;
+  providerReference?: string | null;
+  mpesaReceiptNumber?: string | null;
+  failureReason?: string | null;
   /** ISO 8601 timestamp. */
   createdAt: string;
   updatedAt: string;
 }
+
+export const webhookPayoutPayloadSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    status: z.enum(["completed", "failed"]),
+    mpesaReceiptNumber: z.string().optional(),
+    failureReason: z.string().optional(),
+    providerReference: z.string().optional(),
+  })
+  .strict();
+
+export type WebhookPayoutPayload = z.infer<typeof webhookPayoutPayloadSchema>;
 
 export interface ApiErrorBody {
   error: {

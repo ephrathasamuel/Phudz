@@ -1,4 +1,13 @@
-import type { ApiErrorBody, CashoutRequest, CashoutRequestRecord } from "@phundz/shared";
+import type {
+  ApiErrorBody,
+  AppConfig,
+  CashoutRequest,
+  CashoutRequestRecord,
+  DepositRecord,
+  QuoteRecord,
+  QuoteRequest,
+  WalletBalance,
+} from "@phundz/shared";
 
 // Must be referenced literally so Next.js inlines it into the browser bundle.
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000").replace(/\/+$/, "");
@@ -27,7 +36,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: { Accept: "application/json", ...(init?.body ? { "Content-Type": "application/json" } : {}) },
+      headers: {
+        Accept: "application/json",
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers,
+      },
     });
   } catch {
     throw new ApiError("Could not reach the server. Check your connection and try again.", 0, "NETWORK_ERROR");
@@ -42,6 +55,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError("Something went wrong. Please try again.", response.status, "UNKNOWN_ERROR");
   }
   return body as T;
+}
+
+export function getConfig(): Promise<AppConfig> {
+  return request<AppConfig>("/api/config");
+}
+
+export function getWalletBalance(): Promise<WalletBalance> {
+  return request<WalletBalance>("/api/wallet");
+}
+
+export function getDeposits(): Promise<DepositRecord[]> {
+  return request<DepositRecord[]>("/api/wallet/deposits");
+}
+
+export function requestQuote(input: QuoteRequest): Promise<QuoteRecord> {
+  return request<QuoteRecord>("/api/quotes", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function listCashoutRequests(limit?: number): Promise<CashoutRequestRecord[]> {

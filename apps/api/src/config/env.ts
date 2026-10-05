@@ -10,12 +10,16 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  PAYOUT_MODE: z.enum(["mock", "live"]).default("mock"),
+  WEBHOOK_SECRET: z.string().default("whsec_phundz_demo_secret_2026"),
 });
 
 export interface Config {
   databaseUrl: string;
   port: number;
   webOrigin: string;
+  payoutMode: "mock" | "live";
+  webhookSecret: string;
 }
 
 /** Loads and validates env; throws with the offending variable names so startup fails fast. */
@@ -29,6 +33,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
     databaseUrl: result.data.DATABASE_URL,
     port: result.data.API_PORT,
     webOrigin: result.data.WEB_ORIGIN,
+    payoutMode: result.data.PAYOUT_MODE,
+    webhookSecret: result.data.WEBHOOK_SECRET,
   };
 }
 

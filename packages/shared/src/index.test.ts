@@ -5,7 +5,9 @@ import {
   listCashoutRequestsQuerySchema,
   normalizeKenyanPhone,
   phoneSchema,
+  quoteRequestSchema,
   toFieldErrors,
+  webhookPayoutPayloadSchema,
 } from "./index";
 
 function amountError(amount: unknown): string | undefined {
@@ -84,12 +86,32 @@ describe("Kenyan phone validation", () => {
   });
 });
 
+describe("quote request schema", () => {
+  it("normalizes quote input", () => {
+    expect(quoteRequestSchema.parse({ amount: "50", phone: "0712 345 678" })).toEqual({
+      amount: "50.00",
+      phone: "+254712345678",
+    });
+  });
+});
+
 describe("cash-out request schema", () => {
   it("returns normalized output", () => {
     expect(cashoutRequestSchema.parse({ amount: "25.5", phone: "0712 345-678" })).toEqual({
       amount: "25.50",
       phone: "+254712345678",
     });
+  });
+
+  it("accepts quoteId and idempotencyKey", () => {
+    const parsed = cashoutRequestSchema.parse({
+      amount: "25.50",
+      phone: "0712345678",
+      quoteId: "7f1e5b8c-1b9e-4c55-9d8e-0d5c4a3b2a99",
+      idempotencyKey: "test-idemp-key-12345",
+    });
+    expect(parsed.quoteId).toBe("7f1e5b8c-1b9e-4c55-9d8e-0d5c4a3b2a99");
+    expect(parsed.idempotencyKey).toBe("test-idemp-key-12345");
   });
 
   it("rejects unknown fields with a field-level error", () => {
@@ -107,6 +129,17 @@ describe("cash-out request schema", () => {
         phone: "Enter a valid Kenyan M-Pesa number",
       });
     }
+  });
+});
+
+describe("webhook payout payload schema", () => {
+  it("accepts valid webhook payload", () => {
+    const valid = webhookPayoutPayloadSchema.parse({
+      requestId: "7f1e5b8c-1b9e-4c55-9d8e-0d5c4a3b2a10",
+      status: "completed",
+      mpesaReceiptNumber: "QHK889900",
+    });
+    expect(valid.status).toBe("completed");
   });
 });
 

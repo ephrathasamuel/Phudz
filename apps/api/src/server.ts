@@ -6,7 +6,12 @@ async function main() {
   loadDotenv();
   const config = loadConfig();
   const pool = new Pool({ connectionString: config.databaseUrl });
-  const app = await createApp({ db: pool, webOrigin: config.webOrigin, logger: true });
+  const app = await createApp({
+    db: pool,
+    webOrigin: config.webOrigin,
+    payoutMode: config.payoutMode,
+    logger: true,
+  });
   app.addHook("onClose", () => pool.end());
 
   await app.listen({ port: config.port, host: "0.0.0.0" });

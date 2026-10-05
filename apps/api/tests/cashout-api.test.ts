@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
-import type { CashoutRequestRecord } from "@phundz/shared";
+import type { CashoutRequestRecord, QuoteRecord, WalletBalance } from "@phundz/shared";
 import { createApp } from "../src/app";
 import type { QueryExecutor } from "../src/db/query-executor";
 import { runMigrations } from "../src/db/migrator";
@@ -21,8 +21,12 @@ describe.skipIf(!testDatabaseUrl)("cash-out API with PostgreSQL", () => {
   let pool: Pool;
   let app: FastifyInstance;
 
-  const post = (payload: unknown) => app.inject({ method: "POST", url: "/api/cashout-requests", payload: payload as object });
-  const countRows = async () => Number((await pool.query("SELECT count(*) FROM cashout_requests")).rows[0].count);
+  const post = (payload: unknown) =>
+    app.inject({ method: "POST", url: "/api/cashout-requests", payload: payload as object });
+  const countRows = async () =>
+    Number((await pool.query("SELECT count(*) FROM cashout_requests")).rows[0].count);
+
+  let poolEnded = false;
 
   beforeAll(async () => {
     const url = testDatabaseUrl!;
@@ -30,36 +34,124 @@ describe.skipIf(!testDatabaseUrl)("cash-out API with PostgreSQL", () => {
     if (appUrl && databaseName(appUrl) === databaseName(url)) {
       throw new Error("TEST_DATABASE_URL must point at a different database than DATABASE_URL");
     }
-    pool = new Pool({ connectionString: url });
+    pool = new Pool({ connectionString: url, connectionTimeoutMillis: 5000 });
+    try {
+      const client = await pool.connect();
+      client.release();
+    } catch (err) {
+      await pool.end();
+      poolEnded = true;
+      throw new Error(
+        `Cannot connect to TEST_DATABASE_URL. Is the database running? (${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
     await runMigrations(pool);
-    app = await createApp({ db: pool, webOrigin: WEB_ORIGIN });
-  });
+    app = await createApp({ db: pool, webOrigin: WEB_ORIGIN, payoutMode: "mock" });
+  }, 30_000);
 
   beforeEach(async () => {
-    await pool.query("TRUNCATE cashout_requests");
+    await pool.query("TRUNCATE cashout_requests CASCADE");
+    await pool.query("TRUNCATE quotes CASCADE");
+    await pool.query("UPDATE wallets SET balance_usdc = 2500.000000, held_usdc = 0 WHERE user_id = 'demo_user'");
   });
 
   afterAll(async () => {
     await app?.close();
-    await pool?.end();
+    if (!poolEnded) await pool?.end();
   });
 
-  it("POST saves a pending request with a normalized phone and returns 201", async () => {
+  it("POST saves a request, places ledger hold, and returns 201 with quote details", async () => {
     const response = await post({ amount: "12.50", phone: "+254 712-345-678" });
 
     expect(response.statusCode).toBe(201);
     const body = response.json<CashoutRequestRecord>();
-    expect(body).toMatchObject({ amountUsdc: "12.500000", phoneNumber: "+254712345678", status: "pending" });
+    expect(body.amountUsdc).toBe("12.500000");
+    expect(body.phoneNumber).toBe("+254712345678");
+    expect(body.status).toBe("processing");
+    expect(body.recipientName).toBe("John Kamau N.");
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(new Date(body.createdAt).toISOString()).toBe(body.createdAt);
 
-    const rows = await pool.query("SELECT amount_usdc::text AS amount, phone_number, status FROM cashout_requests WHERE id = $1", [body.id]);
-    expect(rows.rows).toEqual([{ amount: "12.500000", phone_number: "+254712345678", status: "pending" }]);
+    // Verify wallet placed hold on 12.50 USDC
+    const walletRes = await app.inject({ method: "GET", url: "/api/wallet" });
+    const wallet = walletRes.json<WalletBalance>();
+    expect(wallet.availableUsdc).toBe("2487.500000");
+    expect(wallet.heldUsdc).toBe("12.500000");
   });
 
   it("stores boundary amounts exactly", async () => {
     expect((await post({ amount: "1.00", phone: "0712345678" })).json().amountUsdc).toBe("1.000000");
     expect((await post({ amount: "1000.00", phone: "0112345678" })).json().amountUsdc).toBe("1000.000000");
+  });
+
+  it("POST /api/quotes returns locked rate and recipient verification", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/quotes",
+      payload: { amount: "20.00", phone: "0712 345 678" },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const quote = response.json<QuoteRecord>();
+    expect(parseFloat(quote.amountUsdc)).toBe(20);
+    expect(quote.rateKes).toBe("129.5000");
+    expect(quote.recipientName).toBe("John Kamau N.");
+    expect(quote.ttlSeconds).toBeGreaterThan(0);
+  });
+
+  it("rejects request if amount exceeds available wallet balance", async () => {
+    // Set wallet balance low
+    await pool.query("UPDATE wallets SET balance_usdc = 5.000000, held_usdc = 0 WHERE user_id = 'demo_user'");
+
+    const response = await post({ amount: "10.00", phone: "0712345678" });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("INSUFFICIENT_FUNDS");
+  });
+
+  it("POST /api/webhooks/payout settles balance on completed", async () => {
+    const created = (await post({ amount: "10.00", phone: "0712345678" })).json<CashoutRequestRecord>();
+
+    const webhookRes = await app.inject({
+      method: "POST",
+      url: "/api/webhooks/payout",
+      payload: {
+        requestId: created.id,
+        status: "completed",
+        mpesaReceiptNumber: "QHK998877",
+      },
+    });
+
+    expect(webhookRes.statusCode).toBe(200);
+    expect(webhookRes.json().request.status).toBe("completed");
+    expect(webhookRes.json().request.mpesaReceiptNumber).toBe("QHK998877");
+
+    // Held balance was debited permanently
+    const walletRes = await app.inject({ method: "GET", url: "/api/wallet" });
+    const wallet = walletRes.json<WalletBalance>();
+    expect(wallet.heldUsdc).toBe("0.000000");
+    expect(wallet.availableUsdc).toBe("2490.000000");
+  });
+
+  it("POST /api/webhooks/payout releases hold on failed", async () => {
+    const created = (await post({ amount: "10.00", phone: "0712345678" })).json<CashoutRequestRecord>();
+
+    const webhookRes = await app.inject({
+      method: "POST",
+      url: "/api/webhooks/payout",
+      payload: {
+        requestId: created.id,
+        status: "failed",
+        failureReason: "Account limit exceeded",
+      },
+    });
+
+    expect(webhookRes.statusCode).toBe(200);
+    expect(webhookRes.json().request.status).toBe("failed");
+
+    // Held balance returned to available
+    const walletRes = await app.inject({ method: "GET", url: "/api/wallet" });
+    const wallet = walletRes.json<WalletBalance>();
+    expect(wallet.heldUsdc).toBe("0.000000");
+    expect(wallet.availableUsdc).toBe("2500.000000");
   });
 
   it.each([
@@ -112,10 +204,10 @@ describe.skipIf(!testDatabaseUrl)("cash-out API with PostgreSQL", () => {
 
   it("GET returns requests newest first", async () => {
     await pool.query(
-      `INSERT INTO cashout_requests (amount_usdc, phone_number, created_at) VALUES
-         ('10.00', '+254712345678', now() - interval '2 minutes'),
-         ('30.00', '+254712345678', now()),
-         ('20.00', '+254712345678', now() - interval '1 minute')`,
+      `INSERT INTO cashout_requests (user_id, amount_usdc, phone_number, created_at) VALUES
+         ('demo_user', '10.00', '+254712345678', now() - interval '2 minutes'),
+         ('demo_user', '30.00', '+254712345678', now()),
+         ('demo_user', '20.00', '+254712345678', now() - interval '1 minute')`,
     );
 
     const response = await app.inject({ method: "GET", url: "/api/cashout-requests" });
@@ -176,6 +268,15 @@ describe("cash-out API (no database needed)", () => {
     const response = await app.inject({ method: "GET", url: "/health" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
+    await app.close();
+  });
+
+  it("reports /api/config", async () => {
+    const app = await createApp({ db: unusedDb, webOrigin: WEB_ORIGIN, payoutMode: "mock" });
+    const response = await app.inject({ method: "GET", url: "/api/config" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().mode).toBe("mock");
+    expect(response.json().currencyPair).toBe("USDC/KES");
     await app.close();
   });
 
