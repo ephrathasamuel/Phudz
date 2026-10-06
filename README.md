@@ -11,32 +11,32 @@ The codebase is structured around a real-world financial off-ramp pipeline:
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as User Browser (apps/web)
+    actor User as User (apps/web)
     participant API as Fastify API (apps/api)
-    participant Provider as PayoutProvider (Mock/Live)
-    participant DB as PostgreSQL Ledger & Requests
+    participant Provider as PayoutProvider
+    participant DB as PostgreSQL Database
 
     User->>API: 1. Request Quote (amount + M-Pesa phone)
-    API->>Provider: Fetch locked rate & verify M-Pesa recipient name
+    API->>Provider: Fetch locked rate & verify recipient
     Provider-->>API: 1 USDC = 129.50 KES, Fee: 0.50 USDC, TTL: 60s
-    API->>DB: Save locked quote in `quotes`
-    API-->>User: 2. Return Quote (Net KES, verified name, countdown timer)
+    API->>DB: Save locked quote in quotes table
+    API-->>User: 2. Return Quote (Net KES, verified name, countdown)
 
     User->>API: 3. Confirm Cash-Out (amount, phone, quoteId, idempotencyKey)
     API->>DB: Check wallet balance & place ledger hold
-    API->>DB: Insert request as `pending`
+    API->>DB: Insert request as pending
     API->>Provider: Initiate M-Pesa B2C payout
-    Provider-->>API: Provider reference, status: `processing`
+    Provider-->>API: Provider reference, status: processing
     API-->>User: 201 Created (processing)
 
-    Note over Provider,API: Async Daraja B2C Callback
-    Provider->>API: 4. POST /api/webhooks/payout (requestId, status, receiptNumber)
+    Note over Provider, API: Async Daraja B2C Callback
+    Provider->>API: 4. POST /api/webhooks/payout (requestId, status, receipt)
     alt Payout Succeeded
-        API->>DB: Settle ledger hold permanently, mark `completed` + store M-Pesa receipt
+        API->>DB: Settle ledger hold permanently, mark completed + store receipt
     else Payout Failed
-        API->>DB: Release ledger hold back to available balance, mark `failed`
+        API->>DB: Release ledger hold back to available balance, mark failed
     end
-    User->>API: 5. Auto-polling / history refresh -> View settled status & receipt
+    User->>API: 5. Polling / history refresh -> View settled status & receipt
 ```
 
 ---
